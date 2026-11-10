@@ -1,0 +1,13 @@
+{
+  "name": "licitacoes-oportunidades",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Busca de oportunidades de licitação a partir dos dados abertos do PNCP.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "ingest": "node src/ingest.mjs",
+    "serve": "node src/server.mjs",
+    "start": "node src/server.mjs"
+  }
+}

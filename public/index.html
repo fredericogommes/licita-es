@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oportunidades · Licitações</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --line:#272b35; --fg:#e7e9ee; --mut:#9aa3b2; --ac:#4f8cff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:18px 20px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; }
+  header h1 { font-size:18px; margin:0; } header small { color:var(--mut); }
+  .wrap { display:grid; grid-template-columns:300px 1fr; gap:20px; padding:20px; max-width:1200px; margin:0 auto; }
+  @media (max-width:800px){ .wrap{ grid-template-columns:1fr; } }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:10px 0 4px; }
+  input,select { width:100%; padding:8px 10px; background:#0f1218; border:1px solid var(--line); color:var(--fg); border-radius:8px; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  button { margin-top:14px; width:100%; padding:10px; background:var(--ac); color:#fff; border:0; border-radius:8px; font-weight:600; cursor:pointer; }
+  .meta { color:var(--mut); font-size:13px; margin-bottom:10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .card h3 { margin:0 0 6px; font-size:15px; }
+  .tags { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .tag { font-size:11px; color:var(--mut); border:1px solid var(--line); padding:2px 8px; border-radius:999px; }
+  .val { color:#6fe79f; font-weight:600; }
+  a { color:var(--ac); } .obj { color:var(--fg); }
+  .empty { color:var(--mut); padding:40px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Oportunidades</h1>
+  <small>dados abertos do PNCP · protótipo</small>
+</header>
+<div class="wrap">
+  <aside class="panel">
+    <label>Palavra-chave</label>
+    <input id="q" placeholder="ex.: notebook, merenda, obra" />
+    <label>UF</label>
+    <input id="uf" placeholder="ex.: MG, SP (vírgula p/ várias)" />
+    <label>Modalidade</label>
+    <select id="modalidade"><option value="">Todas</option></select>
+    <div class="row">
+      <div><label>Valor mínimo</label><input id="valorMin" type="number" /></div>
+      <div><label>Valor máximo</label><input id="valorMax" type="number" /></div>
+    </div>
+    <label>Com proposta aberta em</label>
+    <input id="propostaAbertaEm" type="date" />
+    <label><input type="checkbox" id="srp" style="width:auto" /> Somente Registro de Preço</label>
+    <button id="buscar">Buscar</button>
+  </aside>
+  <main>
+    <div class="meta" id="meta">Carregando…</div>
+    <div id="lista"></div>
+  </main>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmtBRL = (v) => v == null ? '—' : v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+const fmtData = (s) => s ? new Date(s).toLocaleDateString('pt-BR') : '—';
+
+async function carregarModalidades() {
+  const m = await (await fetch('/api/modalidades')).json();
+  for (const [id, nome] of Object.entries(m)) {
+    const o = document.createElement('option'); o.value = id; o.textContent = nome; $('modalidade').appendChild(o);
+  }
+}
+
+function filtros() {
+  const f = { pagina: 1, tamanhoPagina: 50, ordenarPor:'dataPublicacao', ordem:'desc' };
+  const q = $('q').value.trim(); if (q) f.q = q;
+  const uf = $('uf').value.trim(); if (uf) f.uf = uf.split(',').map(s=>s.trim()).filter(Boolean);
+  const mod = $('modalidade').value; if (mod) f.modalidadeId = Number(mod);
+  if ($('valorMin').value) f.valorMin = Number($('valorMin').value);
+  if ($('valorMax').value) f.valorMax = Number($('valorMax').value);
+  if ($('propostaAbertaEm').value) f.propostaAbertaEm = $('propostaAbertaEm').value;
+  if ($('srp').checked) f.srp = true;
+  return f;
+}
+
+async function buscar() {
+  $('meta').textContent = 'Buscando…';
+  const r = await (await fetch('/api/oportunidades', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(filtros()) })).json();
+  $('meta').textContent = `${r.total} oportunidade(s) · mostrando ${r.itens.length}`;
+  const lista = $('lista'); lista.innerHTML = '';
+  if (!r.itens.length) { lista.innerHTML = '<div class="empty">Nada encontrado. Rode a coleta (ingest) ou amplie os filtros.</div>'; return; }
+  for (const e of r.itens) {
+    const el = document.createElement('div'); el.className = 'card';
+    el.innerHTML = `
+      <h3>${e.orgao?.razaoSocial ?? ''} <span class="tag">${e.unidade?.uf ?? ''}</span></h3>
+      <div class="obj">${(e.objeto||'').slice(0,320)}</div>
+      <div class="tags">
+        <span class="tag">${e.modalidade ?? ''}</span>
+        <span class="tag">${e.situacao ?? ''}</span>
+        ${e.srp ? '<span class="tag">Registro de Preço</span>' : ''}
+        <span class="tag">publicado ${fmtData(e.dataPublicacao)}</span>
+        <span class="tag">propostas até ${fmtData(e.dataEncerramentoProposta)}</span>
+      </div>
+      <div><span class="val">${fmtBRL(e.valorEstimado)}</span> estimado ·
+        ${e.link ? `<a href="${e.link}" target="_blank" rel="noopener">ver edital no PNCP ↗</a>` : ''}</div>`;
+    lista.appendChild(el);
+  }
+}
+
+$('buscar').onclick = buscar;
+$('q').addEventListener('keydown', (ev)=>{ if(ev.key==='Enter') buscar(); });
+carregarModalidades().then(buscar);
+</script>
+</body>
+</html>
