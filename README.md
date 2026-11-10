@@ -71,3 +71,28 @@ data/editais.json    base coletada (gerada pelo ingest)
 
 A engenharia reversa completa da referência está em
 `engenharia-reversa-omercadonacional.md` (no seu PC).
+
+## Banco de dados (Supabase / Postgres)
+
+O schema está em `db/schema.sql` e já foi aplicado no projeto Supabase `licitacoes`.
+Tabelas: `orgaos`, `unidades`, `editais`, `edital_itens`, `coletas` (RLS ligado;
+acesso apenas pelo lado servidor com a service_role key).
+
+Para a coleta gravar no banco, defina duas variáveis de ambiente:
+
+```bash
+export SUPABASE_URL="https://<ref>.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="<service_role key do projeto>"
+node src/ingest.mjs --de 2026-11-07 --ate 2026-11-07
+```
+
+Sem essas variáveis, a coleta grava em `data/editais.json` (modo local).
+
+## Coleta diária automática (GitHub Actions)
+
+`.github/workflows/coleta-diaria.yml` roda todo dia às 05:10 (horário de Brasília)
+e também pode ser disparado à mão (workflow_dispatch) com datas/modalidades/UF.
+Ele precisa de dois **segredos** no repositório (Settings → Secrets and variables → Actions):
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`

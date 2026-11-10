@@ -1,0 +1,51 @@
+name: Coleta diária do PNCP
+
+on:
+  schedule:
+    # 08:10 UTC = 05:10 no horário de Brasília (todo dia)
+    - cron: '10 8 * * *'
+  workflow_dispatch:
+    inputs:
+      de:
+        description: 'Data inicial AAAA-MM-DD (vazio = ontem)'
+        required: false
+      ate:
+        description: 'Data final AAAA-MM-DD (vazio = hoje)'
+        required: false
+      modalidades:
+        description: 'Modalidades separadas por vírgula (vazio = padrão)'
+        required: false
+      uf:
+        description: 'UF, ex.: MG (opcional)'
+        required: false
+
+jobs:
+  coleta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Montar argumentos da coleta
+        id: args
+        env:
+          IN_DE: ${{ github.event.inputs.de }}
+          IN_ATE: ${{ github.event.inputs.ate }}
+          IN_MOD: ${{ github.event.inputs.modalidades }}
+          IN_UF: ${{ github.event.inputs.uf }}
+        run: |
+          DE="${IN_DE:-$(date -u -d 'yesterday' +%Y-%m-%d)}"
+          ATE="${IN_ATE:-$(date -u +%Y-%m-%d)}"
+          ARGS="--de $DE --ate $ATE"
+          [ -n "$IN_MOD" ] && ARGS="$ARGS --modalidades $IN_MOD"
+          [ -n "$IN_UF" ] && ARGS="$ARGS --uf $IN_UF"
+          echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+          echo "Coleta: $ARGS"
+
+      - name: Coletar e gravar no Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node src/ingest.mjs ${{ steps.args.outputs.args }}

@@ -6,6 +6,7 @@ import { listarTudoPorPublicacao, toPncpDate } from './pncp.mjs';
 import { normalizarContratacao } from './normalize.mjs';
 import { salvarEditais, carregarEditais, DATA_PATH } from './store.mjs';
 import { MODALIDADES_PADRAO, nomeModalidade } from './modalidades.mjs';
+import { gravarEditais, supabaseConfigurado } from './supabase.mjs';
 
 function parseArgs(argv) {
   const a = {};
@@ -58,8 +59,15 @@ async function main() {
   }
 
   const editais = [...porId.values()];
-  await salvarEditais(editais);
-  console.log(`\nTotal: ${editais.length} editais salvos em ${DATA_PATH}`);
+
+  if (supabaseConfigurado()) {
+    const r = await gravarEditais(editais);
+    console.log(`\nSupabase: ${r.editais} editais e ${r.orgaos} órgãos gravados.`);
+  } else {
+    await salvarEditais(editais);
+    console.log(`\nTotal: ${editais.length} editais salvos em ${DATA_PATH}`);
+    console.log('(Supabase não configurado: gravei em JSON. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY para gravar no banco.)');
+  }
 }
 
 main().catch((e) => { console.error('\nErro:', e.message); process.exit(1); });
